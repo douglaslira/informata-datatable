@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>INFORMATA - DATATABLE</title>
+</head>
+<body>
+
+    <section>
+        <section class="wrapper">
+
+            <table width="100%" class="display table table-border" id="level-1">
+                <thead>
+                <tr>
+                    <th></th>
+                    <th>Coluna 01</th>
+                    <th>Coluna 02</th>
+                    <th>Coluna 03</th>
+                    <th>Coluna 04</th>
+                    <th>Coluna 05</th>
+                    <th>Coluna 06</th>
+                    <th>Coluna 07</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td colspan="22">LOADING...</td>
+                </tr>
+                </tbody>
+            </table>
+
+        </section>
+    </section>
+
+    <script src="//cdn.datatables.net/1.10.15/js/jquery.dataTables.min.js"></script>
+    <script src="//cdn.datatables.net/colreorder/1.3.3/js/dataTables.colReorder.min.js"></script>
+    <script src="//cdn.datatables.net/fixedcolumns/3.2.2/js/dataTables.fixedColumns.min.js"></script>
+    <script src="informata-datatable.js"></script>
+    <script type="text/javascript">
+
+        $(document).ready(function(){
+
+            window.informata.dataTable('level-1', {
+                url: "grid/loadproductdrill",
+                drilldown: {
+                    enabled: true,
+                    action: "grid/loadproductdlevelone"
+                },
+                columns: [
+                    {data:"A", targets: 0, name: ''},
+                    {data:"B", targets: 1, name: 'Coluna 01'},
+                    {data:"C", targets: 2, name: 'Coluna 02'},
+                    {data:"D", targets: 3, name: 'Coluna 03'},
+                    {data:"E", targets: 4, name: 'Coluna 04'},
+                    {data:"F", targets: 5, name: 'Coluna 05', summarize: true},
+                    {data:"G", targets: 6, name: 'Coluna 06'},
+                    {data:"H", targets: 7, name: 'Coluna 07'}
+                ]
+            }).init();
+
+        });
+    </script>
+
+</body>
+</html>
