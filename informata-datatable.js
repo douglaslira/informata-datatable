@@ -391,8 +391,7 @@
  * window.informata.dataTable('table-main', {
  *   url: "url/to/load-table-main",
  *   drilldown: {
- *     enabled: true,
- *     action: "grid/loadproductdlevelone"
+ *     enabled: true
  *   },
  *   columns: [
  *     {data:"A", targets: 0, name: ''},
@@ -410,13 +409,66 @@
 (function(informata) {
 
     'use strict';
+
     informata.dataTable = dataTable;
+
     function dataTable(idTable, settings) {
 
-        var dataTableInstance = [];
-        var orderTable = [];
+        settings.summarize = settings.summarize === undefined ? true : settings.summarize;
+
+        var clickTemp = null;
 
         return {
+
+            /**
+             * Method to adjusts columns
+             *
+             * @param {type} idElemento
+             * @param {type} obj
+             * @returns {undefined}
+             */
+            adjustColumns: function(idElemento, obj) {
+                var tabela = document.getElementById(idElemento);
+                var rowFilter = document.querySelectorAll('#row-search-' + obj);
+                $("#" + idElemento + "_wrapper").find("table").css({"width": "100%"});
+                if (tabela.parentNode.className === 'dataTables_scrollBody') {
+                    Array.prototype.forEach.call(rowFilter, function(el, i) {
+                        var larguraCelulaFiltroCabecalho = tabela.parentNode.previousElementSibling.firstElementChild.firstElementChild.firstElementChild.firstElementChild.children[i].style.width;
+                        tabela.parentNode.previousElementSibling.firstElementChild.firstElementChild.firstElementChild.firstElementChild.nextElementSibling.children[i].style.cssText += 'min-width: ' + larguraCelulaFiltroCabecalho + '; max-width: ' + larguraCelulaFiltroCabecalho;
+                        el.style.cssText += 'min-width: ' + larguraCelulaFiltroCabecalho + '; max-width: ' + larguraCelulaFiltroCabecalho;
+                        el.parentNode.nextElementSibling.children[i].style.cssText += 'min-width: ' + larguraCelulaFiltroCabecalho + '; max-width: ' + larguraCelulaFiltroCabecalho;
+                    });
+                }
+            },
+
+            /**
+             * Method return instance of DataTable
+             *
+             * @param {type} v
+             * @returns {Boolean}
+             */
+            getInstance: function(v) {
+                return window.informata.dataTableInstance[v] ? window.informata.dataTableInstance[v] : false;
+            },
+
+            /**
+             *
+             * @param {type} v
+             * @returns {window.informata.orderTable|Window.informata.orderTable}
+             */
+            getOrder: function(v) {
+                return window.informata.orderTable[v];
+            },
+
+            /**
+             * Method set custom order
+             *
+             * @param {type} v
+             * @returns {undefined}
+             */
+            setOrder: function(instance, v) {
+                window.informata.orderTable[instance] = v;
+            },
 
             /**
              * Method to notification
@@ -457,8 +509,9 @@
              * @returns {undefined}
              */
             searchColumn: function(instanceTable, instanceName) {
-                orderTable = localStorage.getItem(instanceName + "-order") === null ? instanceTable.columns()[0] : localStorage.getItem(instanceName + "-order").split(',').map(Number);
-                jQuery.each(orderTable, function(key, i) {
+                var me = this;
+                var orderCol = me.getOrder(instanceName + "-order");
+                jQuery.each(orderCol, function(key, i) {
                     if (!settings.drilldown) {
                         if ($("#" + instanceName + "-field-search-" + i).val() !== "") {
                             $("#" + instanceName + "-header-" + key).append("<i style=\"float:right\" class=\"fa fa-filter\" aria-hidden=\"true\"></i>");
@@ -483,23 +536,70 @@
              * TODO: Improve this method
              */
             summarizeColumn: function(instanceTable, instanceName) {
-                orderTable = localStorage.getItem(instanceName + "-order") === null ? instanceTable.columns()[0] : localStorage.getItem(instanceName + "-order").split(',').map(Number);
+                var me = this;
+                var orderCol = me.getOrder(instanceName + "-order");
                 var keyTMP = {};
-                $(".linhaTotalizadora").empty();
                 jQuery.each(settings.columns, function(i, c) {
                     if (c.summarize) {
                         keyTMP.colName = c.name;
                         keyTMP.colTarget = c.targets;
                     }
-                });
-                jQuery.each(orderTable, function(key, pos) {
-                    if (settings.columns[pos].name === keyTMP.colName) {
-                        keyTMP.colSum = instanceTable.column(key).data().sum();
-                        keyTMP.colPosActual = key;
-                        $("#" + instanceName + "-summarize-" + keyTMP.colTarget).empty().html(informata.numberFormat(keyTMP.colSum, 2, ",", "."));
-                    }
+
+                    jQuery.each(orderCol, function(key, pos) {
+                        if (settings.columns[pos].name === keyTMP.colName) {
+                            keyTMP.colSum = instanceTable.column(key, {search: 'applied'}).data().sum();
+                            keyTMP.colPosActual = key;
+                            $("#" + instanceName + "-summarize-" + keyTMP.colTarget).empty().html(window.informata.numberFormat(keyTMP.colSum, 2, ",", "."));
+                        }
+                    });
+
                 });
             },
+
+            /**
+             *
+             * @param {type} instanceTable
+             * @param {type} instanceName
+             * @returns {undefined}
+             */
+            renderFieldColumn: function(instanceTable, instanceName) {
+                var me = this;
+                var orderCol = me.getOrder(instanceName + "-order");
+                var keyTMP = {};
+                jQuery.each(settings.columns, function(i, c) {
+                    if (c.field) {
+                        keyTMP.colName = c.name;
+                        keyTMP.colTarget = c.targets;
+                        keyTMP.field = c.field;
+                    }
+
+                    jQuery.each(orderCol, function(key, pos) {
+                        if (settings.columns[pos].name === keyTMP.colName) {
+                            keyTMP.colPosActual = key;
+                            var field = [];
+                            if (keyTMP.field.type === "text") {
+                                field = ['<input class="form-control input-sm" id="', instanceName, '-field-', keyTMP.colTarget, '-summarize" type="', keyTMP.field.type, '" value="', keyTMP.field.value, '">'];
+                            } else if (keyTMP.field.type === "select") {
+                                field = ['<select class="form-control input-sm" id="', instanceName, '-field-', keyTMP.colTarget, '-summarize"></select>'];
+                            } else if (keyTMP.field.type === "checkbox") {
+                                field = ['<input class="form-control input-sm" id="', instanceName, '-field-', keyTMP.colTarget, '-summarize" type="', keyTMP.field.type, '" value="', keyTMP.field.value, '">'];
+                            }
+
+                            $("#" + instanceName + "-summarize-" + keyTMP.colTarget).empty().html(field.join(""));
+                            var elementEvent = $('#' + instanceName + '-field-' + keyTMP.colTarget + '-summarize');
+                            if (keyTMP.field.actions) {
+                                jQuery.each(keyTMP.field.actions, function(a, b) {
+                                    elementEvent.on(a, function(e) {
+                                        b(e);
+                                    });
+                                });
+                            }
+                        }
+                    });
+
+                });
+            },
+
             /**
              * Method to render value in header
              *
@@ -510,11 +610,12 @@
                 var countRows = $('#' + idTable + ' thead tr th').length;
                 var tt = ["<tr style=\"background-color: #999; border: 1px solid #FFFF; color: #FFF\">"];
                 for (var i = 0; i < countRows; i++) {
-                    tt.push("<td><div class=\"linhaTotalizadora\" id=\"" + obj + "-summarize-" + i + "\">" + i + "</div></td>");
+                    tt.push("<td><div class=\"linhaTotalizadora\" id=\"" + obj + "-summarize-" + i + "\"></div></td>");
                 }
                 tt.push("</tr>");
                 $('#' + idTable + ' thead tr:last').after(tt.join(""));
             },
+
             /**
              * Method to render inputs in header
              *
@@ -527,10 +628,10 @@
                 for (var i = 0; i < countRows; i++) {
 
                     if (!settings.drilldown) {
-                        tt.push("<td><input type=\"text\" id=\"" + obj + "-field-search-" + i + "\" data-instance=\"" + obj + "\" class=\"form-control input-sm\" placeholder=\"Pesquisar...\" /></td>");
+                        tt.push("<td><input type=\"text\" id=\"" + obj + "-field-search-" + i + "\" data-instance=\"" + obj + "\" class=\"form-control input-sm " + obj + "-field-search\" placeholder=\"Pesquisar...\" /></td>");
                     } else {
                         if (settings.drilldown && i !== 0) {
-                            tt.push("<td><input type=\"text\" id=\"" + obj + "-field-search-" + i + "\" data-instance=\"" + obj + "\" class=\"form-control input-sm\" placeholder=\"Pesquisar...\" /></td>");
+                            tt.push("<td><input type=\"text\" id=\"" + obj + "-field-search-" + i + "\" data-instance=\"" + obj + "\" class=\"form-control input-sm " + obj + "-field-search\" placeholder=\"Pesquisar...\" /></td>");
                         } else {
                             tt.push("<td><a href=\"javascript:void(0);\" id=\"" + obj + "-field-search-close\">[X]</a></td>");
                         }
@@ -544,6 +645,7 @@
                 });
                 return;
             },
+
             /**
              * Method to render icons and labels in header
              *
@@ -557,17 +659,26 @@
 
                 var me = this;
                 var objColumn = $(instanceTable.column(i).header());
-                var contentButton = [];
+                var contentButtonSearch = [];
+                var contentButtonConfig = [];
                 var contentBasic = [
                     '<div id="', instanceName, '-header-', i, '">', labelText, '</div>'
                 ];
                 objColumn.empty().html(contentBasic.join(""));
-                contentButton = me.renderButtonSearch(instanceName + "-search-" + i);
+                contentButtonSearch = me.renderButtonSearch(instanceName + "-search-" + i);
+                contentButtonConfig = me.renderButtonConfig(instanceName + "-config-" + i);
                 if (!settings.drilldown) {
-                    $("#" + instanceName + "-header-" + i + "").append(contentButton.join(""));
+                    $("#" + instanceName + "-header-" + i + "").append(contentButtonSearch.join(""));
+
+                    if (i === 0) {
+                        $("#" + instanceName + "-header-" + i + "").append(contentButtonConfig.join(""));
+                    }
+
                 } else {
                     if (settings.drilldown && i !== 0) {
-                        $("#" + instanceName + "-header-" + i + "").append(contentButton.join(""));
+                        $("#" + instanceName + "-header-" + i + "").append(contentButtonSearch.join(""));
+                    } else {
+                        $("#" + instanceName + "-header-" + i + "").append(contentButtonConfig.join(""));
                     }
                 }
 
@@ -575,29 +686,49 @@
                     e.preventDefault();
                     e.stopPropagation();
                     $("." + idTable + "-tempRmv").remove();
-                    me.openRowSearch(instanceName, i);
+                    me.openRowSearch(instanceTable, instanceName, labelText, i);
+                });
+
+                $("#" + instanceName + "-config-" + i).on("click", function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    $("." + idTable + "-tempRmv").remove();
+                    me.openConfig();
                 });
             },
+
             /**
              * Method to enable row to search
              *
+             * @param {type} instanceTable
              * @param {type} instanceName
+             * @param {type} labelText
              * @param {type} i
              * @returns {undefined}
              */
-            openRowSearch: function(instanceName, i) {
+            openRowSearch: function(instanceTable, instanceName, labelText, i) {
                 $("#row-search-" + instanceName).show();
-                $("#" + instanceName + "-field-search-" + i).focus().off("keyup change").on("keyup change", function(e) {
-                    $("." + idTable + "-tempRmv").remove();
-                    var code = e.keyCode || e.which;
-                    var instanceActual = $(this).data().instance;
-                    dataTableInstance[instanceActual].api().column($(this).parent().index() + ':visible').search(this.value).draw();
-                    if (code === 27 || code === 13) {
-                        $("#row-search-" + instanceActual).hide();
-                        $("#" + instanceName + "-header-" + i).append("<i style=\"float:right\" class=\"fa fa-filter\" aria-hidden=\"true\"></i>");
+                var instanceActual = "", keyTMP = {};
+                jQuery.each(settings.columns, function(x, c) {
+                    if (c.name === labelText) {
+                        keyTMP.colName = c.name;
+                        keyTMP.colTarget = c.targets;
                     }
                 });
+                $("#" + instanceName + "-field-search-" + keyTMP.colTarget).focus();
+                $("." + instanceName + "-field-search").off().on("keyup change", function(e) {
+                    $("." + idTable + "-tempRmv").remove();
+                    instanceActual = $(this).data().instance;
+                    window.informata.dataTableInstance[instanceActual].api().column($(this).parent().index() + ':visible').search(this.value).draw();
+                    $("#" + instanceName + "-header-" + i).append("<i style=\"float:right\" class=\"fa fa-filter\" aria-hidden=\"true\"></i>");
+                    var code = e.keyCode || e.which;
+                    if (code === 27 || code === 13) {
+                        $("#row-search-" + instanceActual).hide();
+                    }
+                });
+
             },
+
             /**
              * TODO: Implements to enable filters
              * @returns {undefined}
@@ -605,30 +736,27 @@
             openConfig: function() {
                 var uniqID = informata.uniqID();
                 var contentDialog = ['<div id="', uniqID, '"></div>'];
-                $(contentDialog.join("")).prependTo("#" + idTable).dialog({
+                var optionsDlg = {
                     title: "Configuração",
                     modal: true,
-                    show: {effect: 'fade', duration: 250},
-                    hide: {effect: 'fade', duration: 250},
-                    buttons: [
-                        {
-                            text: "Salvar",
-                            class: "btn btn-primary",
-                            click: function() {
-                                $(this).dialog('destroy').remove();
-                            }
-                        }
-                    ],
+                    show: {effect: 'fade', duration: 1000},
+                    hide: {effect: 'fade', duration: 1000},
                     close: function() {
                         $(this).dialog('destroy').remove();
                     }
-                });
+                };
+                if (settings.filter && settings.filter.buttons) {
+                    optionsDlg.buttons = settings.filter.buttons;
+                }
+                $(contentDialog.join("")).prependTo("#" + idTable).load(settings.filter.url, "", function() {
+                    console.log("LOADING FILTER");
+                }).dialog(optionsDlg);
             },
+
             /**
              * Method to render buttons search
              *
              * @param {type} idBtn
-             * @param instanceName
              * @returns {Array}
              */
             renderButtonSearch: function(idBtn, instanceName) {
@@ -640,6 +768,7 @@
                     '</div>'
                 ];
             },
+
             /**
              * Method to render config button
              *
@@ -663,72 +792,118 @@
              * @returns {undefined}
              */
             startTable: function(obj, data) {
-                var me = this;
-                me.renderSummarize(obj);
+                var me = this, tableColReorder;
+                if (settings.summarize) {
+                    me.renderSummarize(obj);
+                }
                 me.renderSearchField(obj);
-                dataTableInstance[obj] = $("#" + idTable).dataTable({
+
+                window.informata.dataTableInstance[obj] = $("#" + idTable).dataTable({
                     data: data,
                     columns: settings.columns,
                     colReorder: true,
                     stateSave: true,
+                    stateDuration: 60 * 60 * 720,
                     orderCellsTop: true,
+                    autoWidth: false,
                     paging: settings.paginate !== undefined ? settings.paginate : true,
                     pagingType: "full_numbers",
+                    language: {
+                        lengthMenu: "Mostrar _MENU_",
+                        zeroRecords: "Nenhum conteúdo encontrado!",
+                        info: "Mostrando página _PAGE_ de _PAGES_",
+                        infoEmpty: "Sem linhas",
+                        infoFiltered: "(filtrado de _MAX_ total linhas)",
+                        search: "Filtrar:",
+                        paginate: {
+                            first: "Primeiro",
+                            last: "Último",
+                            next: "Próximo",
+                            previous: "Anterior"
+                        },
+                        loadingRecords: "Carregando...",
+                        processing: "Processando..."
+                    },
+                    drawCallback: function() {
+                        if (settings.drilldown) {
+                            $("#" + idTable + " tbody tr td").on("click", function() {
+                                // TODO: Improve this
+                                $("#" + idTable + " tbody tr").each(function() {
+                                    $(this).find("td:first").find("img").attr("src", BASE_URL_EXTERNO + "images/details_open.png");
+                                });
+                                if ($(this).index() === 0) {
+                                    $("." + idTable + "-tempRmv").hide().remove();
+                                    var clickContent = $(this).find("img");
+                                    var objDataClick = clickContent.data();
+                                    var tempID = informata.uniqID();
+                                    var row_index = $(this).parent().index();
+                                    var col_index = $(this).index();
+                                    var countRows = $('#' + idTable + ' thead tr th').length;
+                                    objDataClick.close = false;
+                                    clickTemp = row_index;
+                                    $(this).html($(clickContent[0]).attr("src", BASE_URL_EXTERNO + "images/details_close.png"));
+                                    $('#' + idTable + ' tbody tr').eq(row_index).after("<tr class=\"" + idTable + "-tempRmv\" id=\"rowTmpClick-" + idTable + "-" + row_index + "\" style=\"background-color: #FFFFFF\"><td style=\"padding-bottom: 800px\" colspan=\"" + countRows + "\" id=\"row-" + idTable + "-" + tempID + "\"></td></tr>");
+                                    $("#row-" + idTable + "-" + tempID).empty().html("Carregando...");
+                                    $("#row-" + idTable + "-" + tempID).load(objDataClick.url, "", function() {
+                                        console.log("DRILL LOADING COMPLETE!");
+                                    });
+                                }
+                            });
+                        }
+                    },
                     initComplete: function(settings, json) {
-                        var table = this.api();
+                        var table = this.api(), me = this;
                         var larguraJanela = $('#' + idTable + '_wrapper').width() - 25;
                         $('#' + idTable + '_wrapper .dataTables_paginate').width(larguraJanela);
+                        //table.columns.adjust().draw();
+                        me.adjustColumns(idTable, obj);
                     },
                     stateSaveCallback: function(settings, callback) {
-                        localStorage.setItem(obj + "-order", callback.ColReorder);
+                        $.ajax({
+                            url: BASE_URL + "configuracaotabela/salvartabela?ajax=true&idTable=" + obj,
+                            data: callback,
+                            dataType: "text json",
+                            type: "POST"
+                        });
                     },
                     stateLoadCallback: function(settings, data) {
                         var table = this.api();
+                        $.ajax({
+                            url: BASE_URL + "configuracaotabela?ajax=true&idTable=" + obj,
+                            dataType: "text json",
+                            success: function(response) {
+                                if (response.data) {
+                                    var orderCols = response.data.ColReorder;
+                                    // THE MAGIC!!!! ///////////////////////////
+                                    tableColReorder = new $.fn.dataTable.ColReorder(window.informata.dataTableInstance[obj]);
+                                    tableColReorder.fnOrder(orderCols);
+                                    ////////////////////////////////////////////
+                                }
+                            }
+                        });
                     },
                     headerCallback: function(nHead, aData, iStart, iEnd, aiDisplay) {
                         var table = this.api();
-                        orderTable = localStorage.getItem(obj + "-order") === null ? table.columns()[0] : localStorage.getItem(obj + "-order").split(',').map(Number);
+                        var orderCol = sessionStorage.getItem(obj + "-order") === null ? table.columns()[0] : sessionStorage.getItem(obj + "-order").split(',').map(Number);
+                        me.setOrder(obj + "-order", orderCol);
                         // CUSTOM HEADER ///////////////////////////////////////
                         $("table#" + idTable + " thead tr th").each(function(i, colObj) {
                             me.renderHeader(table, obj, $(this).text(), i);
                         });
-                        me.summarizeColumn(table, obj);
+
+                        if (settings.summarize) {
+                            me.summarizeColumn(table, obj);
+                        }
+                        me.renderFieldColumn(table, obj);
                         me.searchColumn(table, obj);
-                        //table.colReorder.order(orderSave);
                         ////////////////////////////////////////////////////////
                     }
                 });
-                if (settings.drilldown) {
-                    $("#" + idTable + " tbody tr td").click(function() {
 
-                        if ($(this).index() === 0) {
-
-                            if ($("." + idTable + "-tempRmv").is(":visible")) {
-                                $("." + idTable + "-tempRmv").hide().remove();
-                                $(this).html("<a href=\"javascript:void(0);\">[+]</a>");
-                            } else {
-                                $("." + idTable + "-tempRmv").remove();
-                                var tempID = informata.uniqID();
-                                var row_index = $(this).parent().index();
-                                var col_index = $(this).index();
-                                var countRows = $('#' + idTable + ' thead tr th').length;
-                                $(this).html("<a href=\"javascript:void(0);\">[-]</a>");
-                                $('#' + idTable + ' tbody tr').eq(row_index).after("<tr class=\"" + idTable + "-tempRmv\" style=\"background-color: " + informata.randColor() + "\"><td style=\"padding-bottom: 500px\" colspan=\"" + countRows + "\" id=\"row-" + idTable + "-" + tempID + "\"></td></tr>");
-                                if (settings.drilldown.action) {
-                                    $("#row-" + idTable + "-" + tempID).empty().html("Carregando...").load(settings.drilldown.action, "", function() {
-                                        console.log("OK");
-                                    });
-                                }
-                            }
-
-                        }
-
-                    });
-                }
-
-                new $.fn.dataTable.FixedColumns(dataTableInstance[obj], {
+                new $.fn.dataTable.FixedColumns(window.informata.dataTableInstance[obj], {
                     leftColumns: 1
                 });
+
             },
             /**
              * Method return list of instance
@@ -736,7 +911,7 @@
              * @returns {Array}
              */
             instance: function() {
-                return dataTableInstance;
+                return window.informata.dataTableInstance;
             },
             /**
              * Method initialize custom DataTable
@@ -751,14 +926,22 @@
                     async: true,
                     dataType: "text json",
                     beforeSend: function() {
-                        console.log("AGUARDANDO");
+                        console.log("LOADING...");
                     },
                     error: function(txt) {
-                        console.log("DEU ERRO!");
+                        console.log("ERROR: ", txt);
                     },
                     success: function(response, status, xhr) {
                         var newInstance = informata.toCamelCase(idTable);
+//                        if (window.informata.dataTableInstance[newInstance]) {
+//                            var tableObj = window.informata.dataTableInstance[newInstance].api().settings();
+//                            var colReorder = new $.fn.dataTable.ColReorder(window.informata.dataTableInstance[newInstance]);
+//                            tableObj.clear();
+//                            tableObj.rows.add(response.data);
+//                            tableObj.draw();
+//                        } else {
                         me.startTable(newInstance, response.data);
+//                        }
                     }
                 });
             }
@@ -776,7 +959,6 @@
             if (typeof b === 'string') {
                 b = b.replace(/[^\d.-]/g, '') * 1;
             }
-
             return a + b;
         }, 0);
     });
