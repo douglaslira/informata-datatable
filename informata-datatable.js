@@ -852,7 +852,7 @@
                         }
                     },
                     initComplete: function(settings, json) {
-                        var table = this.api(), me = this;
+                        var table = this.api();
                         var larguraJanela = $('#' + idTable + '_wrapper').width() - 25;
                         $('#' + idTable + '_wrapper .dataTables_paginate').width(larguraJanela);
                         //table.columns.adjust().draw();
